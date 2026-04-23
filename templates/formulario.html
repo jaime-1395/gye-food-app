@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>GYE Food App</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+
+    <style>
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f4f6fb;
+            color: #1f2937;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #0f172a, #2563eb);
+            color: white;
+            padding: 28px;
+        }
+
+        .header h1 {
+            margin: 0 0 8px 0;
+            font-size: 36px;
+        }
+
+        .container {
+            max-width: 1350px;
+            margin: 24px auto;
+            padding: 0 18px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 340px 1fr;
+            gap: 22px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 18px;
+            padding: 20px;
+            box-shadow: 0 8px 26px rgba(15, 23, 42, 0.08);
+            margin-bottom: 22px;
+        }
+
+        label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 6px;
+        }
+
+        input, select, textarea, button {
+            width: 100%;
+            padding: 11px 13px;
+            margin-bottom: 14px;
+            border-radius: 11px;
+            border: 1px solid #d1d5db;
+            font-size: 15px;
+        }
+
+        button {
+            background: #2563eb;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        textarea {
+            min-height: 90px;
+        }
+
+        .filters {
+            display: grid;
+            grid-template-columns: 1.2fr 1fr 1fr;
+            gap: 14px;
+        }
+
+        .lugares-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 16px;
+        }
+
+        .lugar-card {
+            background: white;
+            border-radius: 17px;
+            padding: 17px;
+            box-shadow: 0 8px 22px rgba(15, 23, 42, 0.07);
+            border: 2px solid transparent;
+            cursor: pointer;
+        }
+
+        .lugar-card:hover,
+        .lugar-card.active {
+            border-color: #2563eb;
+        }
+
+        .pill {
+            display: inline-block;
+            padding: 5px 11px;
+            border-radius: 999px;
+            background: #e0e7ff;
+            color: #3730a3;
+            font-size: 12px;
+            margin-right: 6px;
+            margin-bottom: 6px;
+        }
+
+        .stars {
+            color: #f59e0b;
+            font-size: 19px;
+        }
+
+        .muted {
+            color: #6b7280;
+            font-size: 14px;
+        }
+
+        #map {
+            height: 390px;
+            border-radius: 17px;
+        }
+
+        .resultado {
+            white-space: pre-wrap;
+            background: #f8fafc;
+            border: 1px solid #e5e7eb;
+            padding: 13px;
+            border-radius: 13px;
+        }
+
+        .success {
+            color: #15803d;
+            font-weight: bold;
+        }
+
+        .error {
+            color: #b91c1c;
+            font-weight: bold;
+        }
+
+        .comentario {
+            border-bottom: 1px solid #e5e7eb;
+            padding: 11px 0;
+        }
+
+        .topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .small-btn {
+            width: auto;
+            padding: 10px 16px;
+            margin-bottom: 0;
+        }
+
+        .kpi {
+            text-align: center;
+            background: #f8fafc;
+        }
+
+        .kpi h3 {
+            font-size: 30px;
+            margin: 0;
+            color: #2563eb;
+        }
+
+        @media (max-width: 980px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+
+            .filters {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <h1>🍽️ GYE Food App</h1>
+        <p>Lugares de comida en Guayaquil con calificaciones, filtros, comentarios, mapa y dashboard BI.</p>
+    </div>
+
+    <div class="container">
+        <div class="grid">
+            <div>
+                <div class="card">
+                    <h2>⭐ Calificar lugar</h2>
+
+                    <form id="form">
+                        <label>Usuario</label>
+                        <select id="usuario_id"></select>
+
+                        <label>Lugar</label>
+                        <select id="lugar_id"></select>
+
+                        <label>Puntuación</label>
+                        <select id="puntuacion">
+                            <option value="5">5 - Excelente</option>
+                            <option value="4">4 - Muy bueno</option>
+                            <option value="3">3 - Bueno</option>
+                            <option value="2">2 - Regular</option>
+                            <option value="1">1 - Malo</option>
+                        </select>
+
+                        <label>Comentario</label>
+                        <textarea id="comentario">Muy bueno</textarea>
+
+                        <button type="submit">Enviar calificación</button>
+                    </form>
+
+                    <h3>Resultado</h3>
+                    <div id="resultado" class="resultado">Sin envíos todavía.</div>
+                </div>
+
+                <div class="card">
+                    <div class="topbar">
+                        <h2>🗺️ Mapa</h2>
+                        <button id="btnVerTodosMapa" type="button" class="small-btn">Ver todos</button>
+                    </div>
+                    <div id="map"></div>
+                </div>
+            </div>
+
+            <div>
+                <div class="card">
+                    <div class="topbar">
+                        <h2>🔍 Buscar lugares</h2>
+                        <button id="btnRecargar" type="button" class="small-btn">Recargar</button>
+                    </div>
+
+                    <div class="filters">
+                        <div>
+                            <label>Buscar por nombre</label>
+                            <input type="text" id="buscar" placeholder="Ej: ceviche, pizza, parrilla">
+                        </div>
+
+                        <div>
+                            <label>Sector</label>
+                            <select id="filtro_sector">
+                                <option value="">Todos</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label>Categoría</label>
+                            <select id="filtro_categoria">
+                                <option value="">Todas</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>📊 Dashboard BI</h2>
+
+                    <div id="dashboard_resumen" class="lugares-grid"></div>
+
+                    <h3>Promedio por categoría</h3>
+                    <div id="dashboard_categorias" class="resultado"></div>
+
+                    <h3>Calificaciones por sector</h3>
+                    <div id="dashboard_sectores" class="resultado"></div>
+                </div>
+
+                <div class="card">
+                    <h2>🏆 Top lugares</h2>
+                    <div id="top_lugares" class="lugares-grid"></div>
+                </div>
+
+                <div class="card">
+                    <h2>📍 Todos los lugares</h2>
+                    <div id="lista_lugares" class="lugares-grid"></div>
+                </div>
+
+                <div class="card">
+                    <h2>💬 Detalle y comentarios</h2>
+                    <div id="detalle_lugar" class="resultado">Selecciona un lugar.</div>
+                    <div id="comentarios" style="margin-top: 16px;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+        let lugaresCache = [];
+        let topCache = [];
+        let currentLugarId = null;
+        let map;
+        let markersLayer;
+        let markers = {};
+
+        function estrellas(valor) {
+            const n = Math.round(Number(valor || 0));
+            return "★".repeat(n) + "☆".repeat(5 - n);
+        }
+
+        function escapeHtml(text) {
+            if (text === null || text === undefined) return "";
+            return String(text)
+                .replaceAll("&", "&amp;")
+                .replaceAll("<", "&lt;")
+                .replaceAll(">", "&gt;")
+                .replaceAll('"', "&quot;")
+                .replaceAll("'", "&#039;");
+        }
+
+        function initMap() {
+            map = L.map("map").setView([-2.170998, -79.922359], 12);
+
+            L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+                attribution: "&copy; OpenStreetMap contributors"
+            }).addTo(map);
+
+            markersLayer = L.layerGroup().addTo(map);
+        }
+
+        function pintarMapa(lugares) {
+            markersLayer.clearLayers();
+            markers = {};
+
+            const puntos = [];
+
+            lugares.forEach(lugar => {
+                if (lugar.latitud && lugar.longitud) {
+                    const lat = Number(lugar.latitud);
+                    const lng = Number(lugar.longitud);
+
+                    puntos.push([lat, lng]);
+
+                    const marker = L.marker([lat, lng]).addTo(markersLayer);
+
+                    marker.bindPopup(`
+                        <strong>${escapeHtml(lugar.nombre)}</strong><br>
+                        ${escapeHtml(lugar.categoria || "Sin categoría")}<br>
+                        ${escapeHtml(lugar.sector || "Sin sector")}<br>
+                        ⭐ ${lugar.promedio_calificacion ?? "Sin calificar"}
+                    `);
+
+                    marker.on("click", () => seleccionarLugar(lugar.id));
+                    markers[lugar.id] = marker;
+                }
+            });
+
+            if (puntos.length > 1) {
+                map.fitBounds(puntos, { padding: [40, 40] });
+            }
+        }
+
+        async function fetchJSON(url) {
+            const res = await fetch(url);
+            return await res.json();
+        }
+
+        async function cargarUsuarios() {
+            const usuarios = await fetchJSON("/usuarios");
+            const select = document.getElementById("usuario_id");
+            select.innerHTML = "";
+
+            usuarios.forEach(usuario => {
+                const option = document.createElement("option");
+                option.value = usuario.id;
+                option.textContent = `${usuario.nombre} (${usuario.email})`;
+                select.appendChild(option);
+            });
+        }
+
+        async function cargarCategorias() {
+            const categorias = await fetchJSON("/categorias");
+            const select = document.getElementById("filtro_categoria");
+            select.innerHTML = '<option value="">Todas</option>';
+
+            categorias.forEach(cat => {
+                const option = document.createElement("option");
+                option.value = cat.nombre;
+                option.textContent = cat.nombre;
+                select.appendChild(option);
+            });
+        }
+
+        async function cargarSectores() {
+            const sectores = await fetchJSON("/sectores");
+            const select = document.getElementById("filtro_sector");
+            select.innerHTML = '<option value="">Todos</option>';
+
+            sectores.forEach(item => {
+                const option = document.createElement("option");
+                option.value = item.sector;
+                option.textContent = item.sector;
+                select.appendChild(option);
+            });
+        }
+
+        async function cargarLugaresParaFormulario() {
+            const select = document.getElementById("lugar_id");
+            select.innerHTML = "";
+
+            lugaresCache.forEach(lugar => {
+                const option = document.createElement("option");
+                option.value = lugar.id;
+                option.textContent = `${lugar.nombre} | ${lugar.categoria || "Sin categoría"} | ${lugar.sector || ""}`;
+                select.appendChild(option);
+            });
+        }
+
+        function renderLugarCard(lugar, isTop = false) {
+            return `
+                <div class="lugar-card ${currentLugarId === lugar.id ? "active" : ""}" onclick="seleccionarLugar(${lugar.id})">
+                    ${isTop ? '<div class="pill">Top</div>' : ""}
+                    <div class="pill">${escapeHtml(lugar.categoria || "Sin categoría")}</div>
+                    <div class="pill">${escapeHtml(lugar.sector || "Sin sector")}</div>
+                    <h3>${escapeHtml(lugar.nombre)}</h3>
+                    <div class="stars">${estrellas(lugar.promedio_calificacion || 0)}</div>
+                    <p><strong>Promedio:</strong> ${lugar.promedio_calificacion ?? "Sin calificar"}</p>
+                    <p><strong>Calificaciones:</strong> ${lugar.total_calificaciones ?? 0}</p>
+                    <p class="muted">${escapeHtml(lugar.direccion || "")}</p>
+                    <p>${escapeHtml(lugar.descripcion || "")}</p>
+                </div>
+            `;
+        }
+
+        function pintarLugares(lugares) {
+            const cont = document.getElementById("lista_lugares");
+            cont.innerHTML = lugares.length
+                ? lugares.map(l => renderLugarCard(l)).join("")
+                : "<p>No se encontraron lugares.</p>";
+        }
+
+        function pintarTop(top) {
+            const cont = document.getElementById("top_lugares");
+            cont.innerHTML = top.length
+                ? top.map(l => renderLugarCard(l, true)).join("")
+                : "<p>No hay lugares calificados.</p>";
+        }
+
+        async function cargarTop() {
+            topCache = await fetchJSON("/lugares/top");
+            pintarTop(topCache);
+        }
+
+        async function cargarDashboard() {
+            const resumen = await fetchJSON("/dashboard/resumen");
+            const categorias = await fetchJSON("/dashboard/categorias");
+            const sectores = await fetchJSON("/dashboard/sectores");
+
+            document.getElementById("dashboard_resumen").innerHTML = `
+                <div class="lugar-card kpi">
+                    <h3>${resumen.total_lugares}</h3>
+                    <p>Total lugares</p>
+                </div>
+                <div class="lugar-card kpi">
+                    <h3>${resumen.total_usuarios}</h3>
+                    <p>Total usuarios</p>
+                </div>
+                <div class="lugar-card kpi">
+                    <h3>${resumen.total_calificaciones}</h3>
+                    <p>Total calificaciones</p>
+                </div>
+                <div class="lugar-card kpi">
+                    <h3>${resumen.promedio_general ?? "N/A"}</h3>
+                    <p>Promedio general</p>
+                </div>
+            `;
+
+            document.getElementById("dashboard_categorias").innerHTML =
+                categorias.map(x => `
+                    <p>
+                        <strong>${escapeHtml(x.categoria)}</strong> |
+                        Promedio: ${x.promedio ?? "N/A"} |
+                        Calificaciones: ${x.total_calificaciones}
+                    </p>
+                `).join("");
+
+            document.getElementById("dashboard_sectores").innerHTML =
+                sectores.map(x => `
+                    <p>
+                        <strong>${escapeHtml(x.sector)}</strong> |
+                        Promedio: ${x.promedio ?? "N/A"} |
+                        Calificaciones: ${x.total_calificaciones}
+                    </p>
+                `).join("");
+        }
+
+        async function cargarLugares() {
+            const q = document.getElementById("buscar").value.trim();
+            const sector = document.getElementById("filtro_sector").value;
+            const categoria = document.getElementById("filtro_categoria").value;
+
+            const params = new URLSearchParams();
+
+            if (q) params.append("q", q);
+            if (sector) params.append("sector", sector);
+            if (categoria) params.append("categoria", categoria);
+
+            lugaresCache = await fetchJSON(`/lugares?${params.toString()}`);
+
+            pintarLugares(lugaresCache);
+            pintarMapa(lugaresCache);
+            await cargarLugaresParaFormulario();
+
+            if (lugaresCache.length && !lugaresCache.some(x => x.id === currentLugarId)) {
+                await seleccionarLugar(lugaresCache[0].id);
+            }
+        }
+
+        async function seleccionarLugar(id) {
+            currentLugarId = Number(id);
+
+            const detalle = await fetchJSON(`/lugares/${id}`);
+            const comentarios = await fetchJSON(`/lugares/${id}/comentarios`);
+
+            document.getElementById("lugar_id").value = String(id);
+
+            document.getElementById("detalle_lugar").innerHTML = `
+                <h3>${escapeHtml(detalle.nombre)}</h3>
+                <p><strong>Categoría:</strong> ${escapeHtml(detalle.categoria || "Sin categoría")}</p>
+                <p><strong>Sector:</strong> ${escapeHtml(detalle.sector || "Sin sector")}</p>
+                <p><strong>Dirección:</strong> ${escapeHtml(detalle.direccion || "")}</p>
+                <p><strong>Ciudad:</strong> ${escapeHtml(detalle.ciudad || "")}</p>
+                <p><strong>Promedio:</strong> ${detalle.promedio_calificacion ?? "Sin calificar"} 
+                    <span class="stars">${estrellas(detalle.promedio_calificacion || 0)}</span>
+                </p>
+                <p><strong>Total calificaciones:</strong> ${detalle.total_calificaciones ?? 0}</p>
+                <p><strong>Descripción:</strong> ${escapeHtml(detalle.descripcion || "")}</p>
+            `;
+
+            const comentariosDiv = document.getElementById("comentarios");
+
+            comentariosDiv.innerHTML = comentarios.length
+                ? comentarios.map(c => `
+                    <div class="comentario">
+                        <strong>${escapeHtml(c.usuario)}</strong>
+                        <div class="stars">${estrellas(c.puntuacion)}</div>
+                        <div>${escapeHtml(c.comentario || "")}</div>
+                        <div class="muted">${escapeHtml(c.fecha_calificacion || "")}</div>
+                    </div>
+                `).join("")
+                : "<p>No hay comentarios todavía.</p>";
+
+            pintarLugares(lugaresCache);
+            pintarTop(topCache);
+
+            if (detalle.latitud && detalle.longitud) {
+                const lat = Number(detalle.latitud);
+                const lng = Number(detalle.longitud);
+
+                map.setView([lat, lng], 15);
+
+                if (markers[id]) {
+                    markers[id].openPopup();
+                }
+            }
+        }
+
+        async function enviarCalificacion(e) {
+            e.preventDefault();
+
+            const payload = {
+                usuario_id: parseInt(document.getElementById("usuario_id").value),
+                lugar_id: parseInt(document.getElementById("lugar_id").value),
+                puntuacion: parseInt(document.getElementById("puntuacion").value),
+                comentario: document.getElementById("comentario").value
+            };
+
+            const res = await fetch("/calificaciones", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify(payload)
+            });
+
+            const data = await res.json();
+
+            if (res.ok) {
+                document.getElementById("resultado").innerHTML =
+                    `<span class="success">✔ ${escapeHtml(data.message)}</span>`;
+            } else {
+                document.getElementById("resultado").innerHTML =
+                    `<span class="error">✘ ${escapeHtml(data.error || "Error")}</span>`;
+            }
+
+            await cargarTop();
+            await cargarLugares();
+            await cargarDashboard();
+            await seleccionarLugar(payload.lugar_id);
+        }
+
+        function verTodosMapa() {
+            const puntos = lugaresCache
+                .filter(l => l.latitud && l.longitud)
+                .map(l => [Number(l.latitud), Number(l.longitud)]);
+
+            if (puntos.length > 1) {
+                map.fitBounds(puntos, { padding: [40, 40] });
+            }
+        }
+
+        function conectarEventos() {
+            document.getElementById("form").addEventListener("submit", enviarCalificacion);
+            document.getElementById("buscar").addEventListener("input", cargarLugares);
+            document.getElementById("filtro_sector").addEventListener("change", cargarLugares);
+            document.getElementById("filtro_categoria").addEventListener("change", cargarLugares);
+
+            document.getElementById("btnRecargar").addEventListener("click", async () => {
+                await cargarTop();
+                await cargarLugares();
+                await cargarDashboard();
+            });
+
+            document.getElementById("btnVerTodosMapa").addEventListener("click", verTodosMapa);
+
+            document.getElementById("lugar_id").addEventListener("change", function() {
+                seleccionarLugar(this.value);
+            });
+        }
+
+        async function init() {
+            initMap();
+            conectarEventos();
+
+            await cargarUsuarios();
+            await cargarCategorias();
+            await cargarSectores();
+            await cargarTop();
+            await cargarDashboard();
+            await cargarLugares();
+
+            setTimeout(() => {
+                map.invalidateSize();
+            }, 300);
+        }
+
+        init();
+    </script>
+</body>
+</html>
