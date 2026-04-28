@@ -11,6 +11,7 @@ app = Flask(__name__)
 app.config["JSON_AS_ASCII"] = False
 CORS(app)
 
+
 def get_connection():
     database_url = os.environ.get("DATABASE_URL")
 
@@ -18,9 +19,6 @@ def get_connection():
         raise Exception("DATABASE_URL no está configurada en Railway")
 
     conn = psycopg2.connect(database_url)
-    conn.set_client_encoding("UTF8")
-    return conn
-
     conn.set_client_encoding("UTF8")
     return conn
 
@@ -46,11 +44,6 @@ def index():
     return redirect("/formulario")
 
 
-@app.route("/api", methods=["GET"])
-def home():
-    return json_response({"message": "API activa"})
-
-
 @app.route("/formulario", methods=["GET"])
 def formulario():
     return render_template("formulario.html")
@@ -66,6 +59,7 @@ def get_usuarios():
         FROM usuarios
         ORDER BY id;
     """)
+
     usuarios = cur.fetchall()
 
     cur.close()
@@ -84,6 +78,7 @@ def get_categorias():
         FROM categorias
         ORDER BY nombre;
     """)
+
     categorias = cur.fetchall()
 
     cur.close()
@@ -103,6 +98,7 @@ def get_sectores():
         WHERE sector IS NOT NULL AND sector <> ''
         ORDER BY sector;
     """)
+
     sectores = cur.fetchall()
 
     cur.close()
@@ -125,6 +121,7 @@ def get_lugares():
         FROM vw_lugares_resumen
         WHERE 1=1
     """
+
     params = []
 
     if q:
@@ -140,7 +137,9 @@ def get_lugares():
         params.append(categoria)
 
     query += """
-        ORDER BY promedio_calificacion DESC NULLS LAST, total_calificaciones DESC, nombre ASC;
+        ORDER BY promedio_calificacion DESC NULLS LAST,
+                 total_calificaciones DESC,
+                 nombre ASC;
     """
 
     cur.execute(query, params)
@@ -160,9 +159,12 @@ def get_top_lugares():
     cur.execute("""
         SELECT *
         FROM vw_lugares_resumen
-        ORDER BY promedio_calificacion DESC NULLS LAST, total_calificaciones DESC, nombre ASC
+        ORDER BY promedio_calificacion DESC NULLS LAST,
+                 total_calificaciones DESC,
+                 nombre ASC
         LIMIT 10;
     """)
+
     lugares = cur.fetchall()
 
     cur.close()
@@ -193,7 +195,8 @@ def get_lugar_por_id(id_lugar):
         LEFT JOIN categorias c ON l.categoria_id = c.id
         LEFT JOIN calificaciones cal ON cal.lugar_id = l.id
         WHERE l.id = %s
-        GROUP BY l.id, l.nombre, c.nombre, l.direccion, l.sector, l.ciudad, l.descripcion, l.latitud, l.longitud;
+        GROUP BY l.id, l.nombre, c.nombre, l.direccion, l.sector,
+                 l.ciudad, l.descripcion, l.latitud, l.longitud;
     """, (id_lugar,))
 
     lugar = cur.fetchone()
@@ -224,6 +227,7 @@ def get_comentarios_por_lugar(id_lugar):
         WHERE cal.lugar_id = %s
         ORDER BY cal.fecha_calificacion DESC;
     """, (id_lugar,))
+
     comentarios = cur.fetchall()
 
     cur.close()
@@ -241,7 +245,7 @@ def crear_calificacion():
         data = request.get_json()
 
         if not data:
-            return json_response({"error": "Debes enviar JSON en el body"}, status=400)
+            return json_response({"error": "Debes enviar JSON"}, status=400)
 
         usuario_id = data.get("usuario_id")
         lugar_id = data.get("lugar_id")
@@ -254,22 +258,8 @@ def crear_calificacion():
                 status=400
             )
 
-        if not isinstance(puntuacion, int) or puntuacion < 1 or puntuacion > 5:
-            return json_response(
-                {"error": "puntuacion debe ser un entero entre 1 y 5"},
-                status=400
-            )
-
         conn = get_connection()
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-
-        cur.execute("SELECT id FROM usuarios WHERE id = %s;", (usuario_id,))
-        if cur.fetchone() is None:
-            return json_response({"error": "Usuario no existe"}, status=404)
-
-        cur.execute("SELECT id FROM lugares WHERE id = %s;", (lugar_id,))
-        if cur.fetchone() is None:
-            return json_response({"error": "Lugar no existe"}, status=404)
 
         cur.execute("""
             INSERT INTO calificaciones (usuario_id, lugar_id, puntuacion, comentario)
@@ -300,6 +290,77 @@ def crear_calificacion():
             cur.close()
         if conn:
             conn.close()
+
+
+@app.route("/dashboard/resumen", methods=["GET"])
+def dashboard_resumen():
+    conn = get_connection()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+    cur.execute("""
+        SELECT
+            (SELECT COUNT(*) FROM lugares) AS total_lugares,
+            (SELECT COUNT(*) FROM usuarios) AS total_usuarios,
+            (SELECT COUNT(*) FROM calificaciones) AS total_calificaciones,
+            (SELECT ROUND(AVG(puntuacion), 2) FROM calificaciones) AS promedio_general;
+    """)
+
+    data = cur.fetchone()
+
+    cur.close()
+    conn.close()
+
+    return json_response(data)
+
+
+@app.route("/dashboard/categorias", methods=["GET"])
+def dashboard_categorias():
+    conn = get_connection()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+    cur.execute("""
+        SELECT
+            c.nombre AS categoria,
+            ROUND(AVG(cal.puntuacion), 2) AS promedio,
+            COUNT(cal.id) AS total_calificaciones
+        FROM categorias c
+        LEFT JOIN lugares l ON l.categoria_id = c.id
+        LEFT JOIN calificaciones cal ON cal.lugar_id = l.id
+        GROUP BY c.id, c.nombre
+        ORDER BY promedio DESC NULLS LAST, total_calificaciones DESC;
+    """)
+
+    data = cur.fetchall()
+
+    cur.close()
+    conn.close()
+
+    return json_response(data)
+
+
+@app.route("/dashboard/sectores", methods=["GET"])
+def dashboard_sectores():
+    conn = get_connection()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+    cur.execute("""
+        SELECT
+            l.sector,
+            ROUND(AVG(cal.puntuacion), 2) AS promedio,
+            COUNT(cal.id) AS total_calificaciones
+        FROM lugares l
+        LEFT JOIN calificaciones cal ON cal.lugar_id = l.id
+        WHERE l.sector IS NOT NULL AND l.sector <> ''
+        GROUP BY l.sector
+        ORDER BY total_calificaciones DESC, promedio DESC NULLS LAST;
+    """)
+
+    data = cur.fetchall()
+
+    cur.close()
+    conn.close()
+
+    return json_response(data)
 
 
 if __name__ == "__main__":
