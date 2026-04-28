@@ -52,7 +52,7 @@ def formulario():
 @app.route("/usuarios", methods=["GET"])
 def get_usuarios():
     conn = get_connection()
-    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur = conn.cursor()
 
     cur.execute("""
         SELECT id, nombre, email
@@ -60,13 +60,20 @@ def get_usuarios():
         ORDER BY id;
     """)
 
-    usuarios = cur.fetchall()
+    rows = cur.fetchall()
+
+    usuarios = []
+    for row in rows:
+        usuarios.append({
+            "id": row[0],
+            "nombre": row[1],
+            "email": row[2]
+        })
 
     cur.close()
     conn.close()
 
     return json_response(usuarios)
-
 
 @app.route("/categorias", methods=["GET"])
 def get_categorias():
