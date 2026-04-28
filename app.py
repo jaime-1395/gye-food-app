@@ -11,15 +11,16 @@ app = Flask(__name__)
 app.config["JSON_AS_ASCII"] = False
 CORS(app)
 
-
 def get_connection():
-    conn = psycopg2.connect(
-        host="localhost",
-        database="gye_food_app",
-        user="postgres",
-        password="1234",
-        port="5432"
-    )
+    database_url = os.environ.get("DATABASE_URL")
+
+    if not database_url:
+        raise Exception("DATABASE_URL no está configurada en Railway")
+
+    conn = psycopg2.connect(database_url)
+    conn.set_client_encoding("UTF8")
+    return conn
+
     conn.set_client_encoding("UTF8")
     return conn
 
